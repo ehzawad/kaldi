@@ -7,7 +7,7 @@ CC ?= gcc        # used for sph2pipe
 
 WGET ?= wget
 
-OPENFST_VERSION ?= 1.7.2
+OPENFST_VERSION ?= 1.8.4
 CUB_VERSION ?= 1.8.0
 # No '?=', since there exists only one version of sph2pipe.
 SPH2PIPE_VERSION = 2.5
@@ -103,7 +103,13 @@ openfst_cleaned:
 
 #== SCTK =======================================================================
 
-SCTK_CXFLAGS = -w -march=native
+# We don't set -march=native on MacOS because it breaks the compilation on M1 CPUs.
+OS := $(shell uname -s)
+SCTK_CXFLAGS = -w
+ifneq ($(OS), Darwin)
+SCTK_CXFLAGS += -march=native
+endif
+
 SCTK_MKENV = CFLAGS="$(CFLAGS) $(SCTK_CXFLAGS)" \
              CXXFLAGS="$(CXXFLAGS) -std=c++11 $(SCTK_CXFLAGS)" \
 
@@ -115,6 +121,8 @@ sclite sctk_made: sctk/.compiled
 
 sctk/.compiled: sctk
 	rm -f sctk/.compiled
+	sed -i -e '2s/^/#include <unistd.h>\n/' sctk/src/sclite/align.c
+	sed -i -e '99s/^/int TEXT_set_lang_prof(char *lprof);\n/' sctk/src/sclite/text.h
 	$(SCTK_MKENV) $(MAKE) -C sctk config
 	$(SCTK_MKENV) $(MAKE) -C sctk all doc
 	$(MAKE) -C sctk install
@@ -159,6 +167,11 @@ sph2pipe_v$(SPH2PIPE_VERSION)/Makefile: sph2pipe-$(SPH2PIPE_VERSION).tar.gz
 	rm -rf sph2pipe_v*
 	tar -xmzf sph2pipe-$(SPH2PIPE_VERSION).tar.gz
 	mv sph2pipe-$(SPH2PIPE_VERSION) sph2pipe_v$(SPH2PIPE_VERSION)
+	# Workaround for macOS bug <rdar://problem/19363342>
+	if [ `uname` = "Darwin" ]; then \
+		sed -i -e "s/#define _XOPEN_SOURCE 500/#define _XOPEN_SOURCE 600/g" sph2pipe_v$(SPH2PIPE_VERSION)/sph2pipe.c ; \
+		sed -i -e "s/#define _XOPEN_SOURCE 500/#define _XOPEN_SOURCE 600/g" sph2pipe_v$(SPH2PIPE_VERSION)/file_headers.c ; \
+	fi
 
 sph2pipe-$(SPH2PIPE_VERSION).tar.gz:
 	if [ -d "$(DOWNLOAD_DIR)" ]; then \

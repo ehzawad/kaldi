@@ -21,6 +21,12 @@ ifeq ($(KALDI_FLAVOR), dynamic)
     endif
     LDFLAGS += -Wl,-rpath=$(shell readlink -f $(KALDILIBDIR))
     EXTRA_LDLIBS += $(foreach dep,$(ADDLIBS), $(dir $(dep))lib$(notdir $(basename $(dep))).so)
+  else ifeq ($(shell uname), FreeBSD)
+    ifdef LIBNAME
+      LIBFILE = lib$(LIBNAME).so
+    endif
+    LDFLAGS += -Wl,-rpath=$(shell readlink -f $(KALDILIBDIR))
+    EXTRA_LDLIBS += $(foreach dep,$(ADDLIBS), $(dir $(dep))lib$(notdir $(basename $(dep))).so)
   else  # Platform not supported
     $(error Dynamic libraries not supported on this platform. Run configure with --static flag.)
   endif
@@ -48,6 +54,10 @@ $(LIBFILE): $(LIBNAME).a
 	$(CXX) -dynamiclib -o $@ -install_name @rpath/$@ $(LDFLAGS) $(OBJFILES) $(LDLIBS)
 	ln -sf $(shell pwd)/$@ $(KALDILIBDIR)/$@
   else ifeq ($(shell uname), Linux)
+        # Building shared library from static (static was compiled with -fPIC)
+	$(CXX) -shared -o $@ -Wl,--as-needed  -Wl,-soname=$@,--whole-archive $(LIBNAME).a -Wl,--no-whole-archive $(LDFLAGS) $(LDLIBS)
+	ln -sf $(shell pwd)/$@ $(KALDILIBDIR)/$@
+  else ifeq ($(shell uname), FreeBSD)
         # Building shared library from static (static was compiled with -fPIC)
 	$(CXX) -shared -o $@ -Wl,--as-needed  -Wl,-soname=$@,--whole-archive $(LIBNAME).a -Wl,--no-whole-archive $(LDFLAGS) $(LDLIBS)
 	ln -sf $(shell pwd)/$@ $(KALDILIBDIR)/$@
@@ -135,11 +145,16 @@ ifneq ($(CC_SRCS),)
 CC_DEP_COMMAND=$(CXX) -M $(CXXFLAGS) $(CC_SRCS)
 endif
 
-ifeq ($(CUDA), true)
+ifeq ($(IS_GPU_BUILD), true)
 CUDA_SRCS=$(wildcard *.cu)
 # Check if any CUDA .cu sources exist to run dependency commands on.
 ifneq ($(CUDA_SRCS),)
+ifeq ($(CUDA), true)
 NVCC_DEP_COMMAND = $(CUDATKDIR)/bin/nvcc -M $(CUDA_FLAGS) $(CUDA_INCLUDE) $(CUDA_SRCS)
+endif
+ifeq ($(ROCM), true)
+HIPCC_DEP_COMMAND = $(HIPCC) -M $(ROCM_FLAGS) $(ROCM_INCLUDE) $(CUDA_SRCS)
+endif
 endif
 endif
 
@@ -151,6 +166,9 @@ ifneq ($(CC_DEP_COMMAND),)
 endif
 ifneq ($(NVCC_DEP_COMMAND),)
 	-$(NVCC_DEP_COMMAND) >> .depend.mk
+endif
+ifneq ($(HIPCC_DEP_COMMAND),)
+	-$(HIPCC_DEP_COMMAND) >> .depend.mk
 endif
 
 # removing automatic making of "depend" as it's quite slow.

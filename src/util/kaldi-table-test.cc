@@ -24,6 +24,8 @@
 #include "util/kaldi-holder.h"
 #include "util/table-types.h"
 
+#include <random>
+
 namespace kaldi {
 
 void UnitTestReadScriptFile() {
@@ -349,7 +351,8 @@ void UnitTestTableSequentialInt32(bool binary) {
     k2.push_back(sbr.Key());
     v2.push_back(sbr.Value());
   }
-  KALDI_ASSERT(sbr.Close());
+  ans = sbr.Close();
+  KALDI_ASSERT(ans);
   KALDI_ASSERT(k2 == k);
   KALDI_ASSERT(v2 == v);
 }
@@ -382,7 +385,8 @@ void UnitTestTableSequentialBool(bool binary) {
     k2.push_back(sbr.Key());
     v2.push_back(sbr.Value());
   }
-  KALDI_ASSERT(sbr.Close());
+  ans = sbr.Close();
+  KALDI_ASSERT(ans);
   KALDI_ASSERT(k2 == k);
   KALDI_ASSERT(v2 == v);
 }
@@ -416,7 +420,8 @@ void UnitTestTableSequentialDouble(bool binary) {
     k2.push_back(sbr.Key());
     v2.push_back(sbr.Value());
   }
-  KALDI_ASSERT(sbr.Close());
+  ans = sbr.Close();
+  KALDI_ASSERT(ans);
   KALDI_ASSERT(k2 == k);
   if (binary) {
     KALDI_ASSERT(v2 == v);
@@ -460,7 +465,8 @@ void UnitTestTableSequentialDoubleBoth(bool binary, bool read_scp) {
     k2.push_back(sbr.Key());
     v2.push_back(sbr.Value());
   }
-  KALDI_ASSERT(sbr.Close());
+  ans = sbr.Close();
+  KALDI_ASSERT(ans);
   KALDI_ASSERT(k2 == k);
   if (binary) {
     KALDI_ASSERT(v2 == v);
@@ -509,7 +515,8 @@ void UnitTestTableSequentialInt32VectorBoth(bool binary, bool read_scp) {
     k2.push_back(sbr.Key());
     v2.push_back(sbr.Value());
   }
-  KALDI_ASSERT(sbr.Close());
+  ans = sbr.Close();
+  KALDI_ASSERT(ans);
   KALDI_ASSERT(k2 == k);
   KALDI_ASSERT(v2 == v);
 }
@@ -549,7 +556,8 @@ void UnitTestTableSequentialInt32PairVectorBoth(bool binary, bool read_scp) {
     k2.push_back(sbr.Key());
     v2.push_back(sbr.Value());
   }
-  KALDI_ASSERT(sbr.Close());
+  ans = sbr.Close();
+  KALDI_ASSERT(ans);
   KALDI_ASSERT(k2 == k);
   KALDI_ASSERT(v2 == v);
 }
@@ -592,7 +600,8 @@ void UnitTestTableSequentialInt32VectorVectorBoth(bool binary, bool read_scp) {
     k2.push_back(sbr.Key());
     v2.push_back(sbr.Value());
   }
-  KALDI_ASSERT(sbr.Close());
+  ans = sbr.Close();
+  KALDI_ASSERT(ans);
   KALDI_ASSERT(k2 == k);
   KALDI_ASSERT(v2 == v);
 }
@@ -639,7 +648,8 @@ void UnitTestTableSequentialInt32Script(bool binary) {
     k2.push_back(sbr.Key());
     v2.push_back(sbr.Value());
   }
-  KALDI_ASSERT(sbr.Close());
+  ans = sbr.Close();
+  KALDI_ASSERT(ans);
 
   unlink("tmp.scp");
   for (size_t i = 0; i < script.size(); i++) {
@@ -682,7 +692,8 @@ void UnitTestTableSequentialDoubleMatrixBoth(bool binary, bool read_scp) {
     k2.push_back(sbr.Key());
     v2.push_back(new Matrix<double>(sbr.Value()));
   }
-  KALDI_ASSERT(sbr.Close());
+  ans = sbr.Close();
+  KALDI_ASSERT(ans);
   KALDI_ASSERT(k2 == k);
   if (binary) {
     for (size_t i = 0; i < v2.size(); i++)
@@ -736,7 +747,8 @@ void UnitTestTableSequentialBaseFloatVectorBoth(bool binary, bool read_scp) {
     k2.push_back(sbr.Key());
     v2.push_back(new Vector<BaseFloat>(sbr.Value()));
   }
-  KALDI_ASSERT(sbr.Close());
+  ans = sbr.Close();
+  KALDI_ASSERT(ans);
   KALDI_ASSERT(k2 == k);
   if (binary) {
     for (size_t i = 0; i < v2.size(); i++)
@@ -829,10 +841,11 @@ void UnitTestTableRandomBothDouble(bool binary, bool read_scp,
         bool ans = sbr.HasKey(cur_key);
         KALDI_ASSERT(ans == true);
       }
+      auto v2 = sbr.Value(cur_key);
       if (binary) {
-        KALDI_ASSERT(value == sbr.Value(cur_key));
+        KALDI_ASSERT(value == v2);
       } else {
-        KALDI_ASSERT(ApproxEqual(value, sbr.Value(cur_key)));
+        KALDI_ASSERT(ApproxEqual(value, v2));
       }
     }
   }
@@ -841,6 +854,9 @@ void UnitTestTableRandomBothDouble(bool binary, bool read_scp,
 
 
 void UnitTestRangesMatrix(bool binary) {
+  std::random_device rd;
+  std::mt19937 g(rd());
+
   int32 archive_size = RandInt(1, 10);
   std::vector<std::pair<std::string, Matrix<BaseFloat> > > archive_contents(
       archive_size);
@@ -854,7 +870,7 @@ void UnitTestRangesMatrix(bool binary) {
     archive_contents[i].second.SetRandn();
   }
   if (RandInt(0, 1) == 0)
-    std::random_shuffle(archive_contents.begin(), archive_contents.end());
+    std::shuffle(archive_contents.begin(), archive_contents.end(), g);
 
   std::ostringstream writer_name;
   writer_name << "ark,scp";
@@ -1034,10 +1050,11 @@ void UnitTestTableRandomBothDoubleMatrix(bool binary, bool read_scp,
         bool ans = sbr.HasKey(cur_key);
         KALDI_ASSERT(ans == true);
       }
+      auto v2 = sbr.Value(cur_key);
       if (binary) {
-        KALDI_ASSERT(value_ptr->ApproxEqual(sbr.Value(cur_key), 1.0e-10));
+        KALDI_ASSERT(value_ptr->ApproxEqual(v2, 1.0e-10));
       } else {
-        KALDI_ASSERT(value_ptr->ApproxEqual(sbr.Value(cur_key), 0.01));
+        KALDI_ASSERT(value_ptr->ApproxEqual(v2, 0.01));
       }
     }
   }
